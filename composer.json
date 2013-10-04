@@ -1,0 +1,27 @@
+{
+    "name": "kj/payment-stripe-bundle",
+    "type": "symfony-bundle",
+    "description": "Payment Bundle providing access to the Stripe API",
+    "keywords": ["stripe", "payment", "Symfony2"],
+    "homepage": "https://github.com/kengjin/KJPaymentStripeBundle",
+    "license": "MIT",
+	"version": "1.0.0",
+    "authors": [
+        {
+            "name": "Keng Jin Chew",
+            "email": "kjchew@gmail.com"
+        }
+    ],
+    "require": {
+        "php": ">=5.3.2",
+        "symfony/framework-bundle": ">=2.0,<2.2-dev",
+        "jms/payment-core-bundle": "dev-master"
+    },
+    "require-dev": {
+        "symfony/browser-kit": "2.1.x-dev"
+    },
+    "autoload": {
+        "psr-0": { "KJ\\Payment\\StripeBundle": "" }
+    },
+    "target-dir": "KJ/Payment/StripeBundle"
+}
