@@ -1,0 +1,3 @@
+kj_payment_stripe_homepage:
+    path:  /hello/{name}
+    defaults: { _controller: KJPaymentStripeBundle:Default:index }
