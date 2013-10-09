@@ -1,0 +1,31 @@
+<?xml version="1.0" ?>
+
+<container xmlns="http://symfony.com/schema/dic/services"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://symfony.com/schema/dic/services http://symfony.com/schema/dic/services/services-1.0.xsd">
+
+    <parameters>
+        <parameter key="payment.plugin.stripe_credit_card.class">KJ\Payment\StripeBundle\Plugin\StripeCreditCardPlugin</parameter>
+        <parameter key="payment.form.stripe_credit_card_type.class">KJ\Payment\StripeBundle\Form\StripeCreditCardType</parameter>
+		
+		<parameter key="payment.stripe.client.class">KJ\Payment\StripeBundle\Client\Client</parameter>
+    </parameters>
+
+    <services>
+        <service id="payment.plugin.stripe_credit_card" class="%payment.plugin.stripe_credit_card.class%">
+			<argument type="service" id="validator"/>
+			<argument type="service" id="payment.stripe.client" />
+            <tag name="payment.plugin" />			
+        </service>
+
+        <service id="payment.form.stripe_credit_card_type" class="%payment.form.stripe_credit_card_type.class%">
+            <tag name="payment.method_form_type" />
+            <tag name="form.type" alias="stripe_credit_card" />
+        </service>
+		
+        <service id="payment.stripe.client" class="%payment.stripe.client.class%">
+			<argument>%payment.stripe.api_key%</argument>
+			<argument>%payment.stripe.api_version%</argument>
+        </service>
+    </services>
+</container>
