@@ -42,7 +42,7 @@ class StripeCreditCardType extends AbstractType
                 'required' => false,
                 'render_optional_text' => false,
             ))
-            ->add('exp_year', 'optionalchoice', array(
+            ->add('exp_year', 'choice', array(
                 'label' => ' ',
                 'error_type' => 'block',
                 'empty_value' => 'YYYY',
