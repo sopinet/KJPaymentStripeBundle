@@ -5,9 +5,12 @@ namespace KJ\Payment\StripeBundle\Client;
 use JMS\Payment\CoreBundle\Entity\Payment;
 use JMS\Payment\CoreBundle\Model\PaymentInstructionInterface;
 use JMS\Payment\CoreBundle\Model\FinancialTransactionInterface;
+use JMS\Payment\CoreBundle\Plugin\PluginInterface;
+use JMS\Payment\CoreBundle\Plugin\Exception\Exception;
 use JMS\Payment\CoreBundle\Plugin\Exception\InvalidDataException;
+use JMS\Payment\CoreBundle\Plugin\Exception\FinancialException;
 use JMS\Payment\CoreBundle\Plugin\Exception\CommunicationException;
-use JMS\Payment\CoreBundle\Plugin\Exception as JMSPluginException;
+
 
 
 class Client
@@ -64,20 +67,41 @@ class Client
                 ),
             ));
 
-        } catch (\Stripe_CardError $e) {
-            throw $e;
+        } catch (\Stripe_AuthenticationError $e) {
+            $body = $e->getJsonBody();
+            $err = $body['error'];
 
-        } catch (Stripe_InvalidRequestError $e) {
-            throw new InvalidDataException('The API request was not successful (Reason: Invalid parameters)');
+            $ex = new FinancialException($e->getMessage());
+            $transaction->setResponseCode($err['type']);
+            $transaction->setReasonCode('authentication_error');
+            $ex->setFinancialTransaction($transaction);
+
+            throw $ex;
 
         } catch (\Stripe_Error $e) {
             $body = $e->getJsonBody();
             $err = $body['error'];
 
-            throw new CommunicationException('The API request was not successful (Reason: ' . $err['message'] . ')');
+            if (array_key_exists('code', $err) && !empty($err['code'])) {
+                $reasonCode = $err['code'];
+            } else {
+                $reasonCode = PluginInterface::REASON_CODE_INVALID;
+            }
+
+            $ex = new FinancialException($err['message']);
+            $transaction->setResponseCode($err['type']);
+            $transaction->setReasonCode($reasonCode);
+            $ex->setFinancialTransaction($transaction);
+
+            throw $ex;
 
         } catch (\Exception $e) {
-            throw new JMSPluginException('The API request was not successful (' . $e->getCode() . ': ' . $e->getMessage() . ')');
+            $ex = new FinancialException($e->getMessage());
+            $transaction->setResponseCode($e->getCode());
+            $transaction->setReasonCode(PluginInterface::REASON_CODE_INVALID);
+            $ex->setFinancialTransaction($transaction);
+
+            throw $ex;
         }
 
         return $response;
@@ -138,14 +162,41 @@ class Client
                 'refund_application_fee' => false
             ));
 
-        } catch (Stripe_Error $e) {
+        } catch (\Stripe_AuthenticationError $e) {
             $body = $e->getJsonBody();
             $err = $body['error'];
 
-            throw new CommunicationException('The API request was not successful (Reason: ' . $err['message'] . ')');
+            $ex = new FinancialException($e->getMessage());
+            $transaction->setResponseCode($err['type']);
+            $transaction->setReasonCode('authentication_error');
+            $ex->setFinancialTransaction($transaction);
 
-        } catch (Exception $e) {
-            throw new JMSPluginException('The API request was not successful (' . $e->getCode() . ': ' . $e->getMessage() . ')');
+            throw $ex;
+
+        } catch (\Stripe_Error $e) {
+            $body = $e->getJsonBody();
+            $err = $body['error'];
+
+            if (array_key_exists('code', $err) && !empty($err['code'])) {
+                $reasonCode = $err['code'];
+            } else {
+                $reasonCode = PluginInterface::REASON_CODE_INVALID;
+            }
+
+            $ex = new FinancialException($err['message']);
+            $transaction->setResponseCode($err['type']);
+            $transaction->setReasonCode($reasonCode);
+            $ex->setFinancialTransaction($transaction);
+
+            throw $ex;
+
+        } catch (\Exception $e) {
+            $ex = new FinancialException($e->getMessage());
+            $transaction->setResponseCode($e->getCode());
+            $transaction->setReasonCode(PluginInterface::REASON_CODE_INVALID);
+            $ex->setFinancialTransaction($transaction);
+
+            throw $ex;
         }
 
         return $response;

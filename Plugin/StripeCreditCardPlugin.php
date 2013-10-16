@@ -144,9 +144,6 @@ class StripeCreditCardPlugin extends AbstractPlugin
      * @param \JMS\Payment\CoreBundle\Model\FinancialTransactionInterface $transaction
      * @param boolean $retry Whether this is a retry transaction
      * @return void
-     * @throws \JMS\Payment\CoreBundle\Plugin\Exception\FinancialException      if there is a card error
-     * @throws \JMS\Payment\CoreBundle\Plugin\Exception\InvalidDataException    if the request has invalid parameters
-     * @throws \JMS\Payment\CoreBundle\Plugin\Exception\CommunicationException  if there is an API communiation error
      */
     public function approve(FinancialTransactionInterface $transaction, $retry)
     {
@@ -158,35 +155,12 @@ class StripeCreditCardPlugin extends AbstractPlugin
      *
      * @param \JMS\Payment\CoreBundle\Model\FinancialTransactionInterface $transaction
      * @param boolean $capture
-     * @throws \JMS\Payment\CoreBundle\Plugin\Exception\FinancialException      if there is a card error
-     * @throws \JMS\Payment\CoreBundle\Plugin\Exception\InvalidDataException    if the request has invalid parameters
-     * @throws \JMS\Payment\CoreBundle\Plugin\Exception\CommunicationException  if there is an API communiation error
+     * @throws \JMS\Payment\CoreBundle\Plugin\Exception\FinancialException
      */
     protected function chargeCard(FinancialTransactionInterface $transaction, $capture = true)
     {
-        try {
-            // verify and charge card
-            $charge = $this->client->charge($transaction, $capture);
-
-        } catch (\Stripe_CardError $e) {
-            $body = $e->getJsonBody();
-            $err = $body['error'];
-
-            $ex = new FinancialException($err['code']);
-            $transaction->setResponseCode($err['type']);
-            $transaction->setReasonCode($err['code']);
-            $ex->setFinancialTransaction($transaction);
-
-            throw $ex;
-
-        } catch (Exception $e) {
-            $ex = new FinancialException($e->getMessage());
-            $transaction->setResponseCode($e->getCode());
-            $transaction->setReasonCode(PluginInterface::REASON_CODE_INVALID);
-            $ex->setFinancialTransaction($transaction);
-
-            throw $ex;
-        }
+        // verify and charge card
+        $charge = $this->client->charge($transaction, $capture);
 
         // complete the transaction
         $transaction->getExtendedData()->set('charge_id', $charge->id);
@@ -208,9 +182,6 @@ class StripeCreditCardPlugin extends AbstractPlugin
      * @param \JMS\Payment\CoreBundle\Model\FinancialTransactionInterface $transaction
      * @param boolean $retry Whether this is a retry transaction
      * @return void
-     * @throws \JMS\Payment\CoreBundle\Plugin\Exception\FinancialException      if there is a card error
-     * @throws \JMS\Payment\CoreBundle\Plugin\Exception\InvalidDataException    if the request has invalid parameters
-     * @throws \JMS\Payment\CoreBundle\Plugin\Exception\CommunicationException  if there is an API communiation error
      */
     public function approveAndDeposit(FinancialTransactionInterface $transaction, $retry)
     {
@@ -226,18 +197,8 @@ class StripeCreditCardPlugin extends AbstractPlugin
      */
     function credit(FinancialTransactionInterface $transaction, $retry)
     {
-        try {
-            // refund transaction
-            $response = $this->client->refund($transaction);
-
-        } catch (Exception $e) {
-            $ex = new FinancialException($e->getMessage());
-            $transaction->setResponseCode($e->getCode());
-            $transaction->setReasonCode(PluginInterface::REASON_CODE_INVALID);
-            $ex->setFinancialTransaction($transaction);
-
-            throw $ex;
-        }
+        // refund transaction
+        $response = $this->client->refund($transaction);
 
         // complete the transaction
         $transaction->setReferenceNumber($response->id);
