@@ -21,29 +21,27 @@ use Symfony\Component\Validator\Validator;
  */
 class StripeCreditCardPlugin extends AbstractPlugin
 {
-	/**
-	 * @var \Symfony\Component\Validator\Validator 
-	 */
-	protected $validator;
-
-	/**
+    /**
+     * @var \Symfony\Component\Validator\Validator
+     */
+    protected $validator;
+    /**
      * @var \KJ\Payment\StripeBundle\Client\Client
      */
     protected $client;
-	
-	
-	/**
-	 * Constructor
-	 * 
-	 * @param \Symfony\Component\Validator\Validator $validator
-	 * @param \KJ\Payment\StripeBundle\Client\Client $client
-	 */
+
+    /**
+     * Constructor
+     *
+     * @param \Symfony\Component\Validator\Validator $validator
+     * @param \KJ\Payment\StripeBundle\Client\Client $client
+     */
     public function __construct(Validator $validator, Client $client)
     {
-		$this->validator = $validator;
+        $this->validator = $validator;
         $this->client = $client;
-    }	
-	
+    }
+
     /**
      * @param string $paymentSystemName
      *
@@ -53,7 +51,7 @@ class StripeCreditCardPlugin extends AbstractPlugin
     {
         return 'stripe_credit_card' === $paymentSystemName;
     }
-	
+
     /**
      * This method checks whether all required parameters exist in the given
      * PaymentInstruction, and whether they are syntactically correct.
@@ -68,71 +66,71 @@ class StripeCreditCardPlugin extends AbstractPlugin
      *
      * @throws \JMS\Payment\CoreBundle\Plugin\Exception\InvalidPaymentInstructionException if the the PaymentInstruction is not valid
      */
-	public function checkPaymentInstruction(PaymentInstructionInterface $instruction)
+    public function checkPaymentInstruction(PaymentInstructionInterface $instruction)
     {
-		// define form validators
-		$constraints = new Assert\Collection(array(
-			'name' => array(
-				new Assert\NotBlank(array('message' => 'Required')),
-			),
-			'number' => array(
-				new Assert\NotBlank(array('message' => 'Required')),
-				new Assert\Length(array('min' => 12, 'max' => 19, 'minMessage' => 'Invalid card number 1', 'maxMessage' => 'Invalid card number 2')),
-				new Assert\Luhn(array('message' => 'Invalid card number')),
-			),
-			'exp_month' => array(
-				new Assert\NotBlank(array('message' => 'Required')),
-				new Assert\Range(array('min' => 1, 'max' => 12, 'minMessage' => 'Invalid code value', 'maxMessage' => 'Invalid code value')),
-			),
-			'exp_year' => array(
-				new Assert\NotBlank(array('message' => 'Required')),
-				new Assert\Range(array('min' => date('Y'), 'max' => date('Y', strtotime('+20 years')), 'minMessage' => 'Invalid date', 'maxMessage' => 'Invalid date')),
-			),
-			'cvc' => array(
-				new Assert\NotBlank(array('message' => 'Required')),
-				new Assert\Length(array('min' => 3, 'max' => 4, 'minMessage' => 'Invalid code value', 'maxMessage' => 'Invalid code value')),
-			),
-			'address_line1' => array(
-				new Assert\NotBlank(array('message' => 'Required')),
-			),
-			'address_line2' => array(),
-			'address_city' => array(
+        // define form validators
+        $constraints = new Assert\Collection(array(
+            'name' => array(
                 new Assert\NotBlank(array('message' => 'Required')),
             ),
-			'address_state' => array(
+            'number' => array(
+                new Assert\NotBlank(array('message' => 'Required')),
+                new Assert\Length(array('min' => 12, 'max' => 19, 'minMessage' => 'Invalid card number 1', 'maxMessage' => 'Invalid card number 2')),
+                new Assert\Luhn(array('message' => 'Invalid card number')),
+            ),
+            'exp_month' => array(
+                new Assert\NotBlank(array('message' => 'Required')),
+                new Assert\Range(array('min' => 1, 'max' => 12, 'minMessage' => 'Invalid code value', 'maxMessage' => 'Invalid code value')),
+            ),
+            'exp_year' => array(
+                new Assert\NotBlank(array('message' => 'Required')),
+                new Assert\Range(array('min' => date('Y'), 'max' => date('Y', strtotime('+20 years')), 'minMessage' => 'Invalid date', 'maxMessage' => 'Invalid date')),
+            ),
+            'cvc' => array(
+                new Assert\NotBlank(array('message' => 'Required')),
+                new Assert\Length(array('min' => 3, 'max' => 4, 'minMessage' => 'Invalid code value', 'maxMessage' => 'Invalid code value')),
+            ),
+            'address_line1' => array(
                 new Assert\NotBlank(array('message' => 'Required')),
             ),
-			'address_country' => array(
-				new Assert\NotBlank(array('message' => 'Required')),
-			),
-			'address_zip' => array(
-				new Assert\NotBlank(array('message' => 'Required')),
-			),
-		));
-		
-		// extract form values from extended data
-		$dateToValidate = array();
-		foreach ($constraints->fields as $name => $constraint) {
-			$dateToValidate[$name] = $instruction->getExtendedData()->get($name);
-		}
-		
-		// validate input data
-		$errors = $this->validator->validateValue($dateToValidate, $constraints);
-		
-		// transform validator errors into payment exceptions
-		$errorBuilder = new ErrorBuilder();
-		foreach ($errors as $error) {
-			// KLUDGE: remove [] around field name
-			$field = substr($error->getPropertyPath(), 1, -1);
-			
-			$errorBuilder->addDataError('data_stripe_credit_card.'.$field, $error->getMessage());
-		}
+            'address_line2' => array(),
+            'address_city' => array(
+                new Assert\NotBlank(array('message' => 'Required')),
+            ),
+            'address_state' => array(
+                new Assert\NotBlank(array('message' => 'Required')),
+            ),
+            'address_country' => array(
+                new Assert\NotBlank(array('message' => 'Required')),
+            ),
+            'address_zip' => array(
+                new Assert\NotBlank(array('message' => 'Required')),
+            ),
+        ));
+
+        // extract form values from extended data
+        $dateToValidate = array();
+        foreach ($constraints->fields as $name => $constraint) {
+            $dateToValidate[$name] = $instruction->getExtendedData()->get($name);
+        }
+
+        // validate input data
+        $errors = $this->validator->validateValue($dateToValidate, $constraints);
+
+        // transform validator errors into payment exceptions
+        $errorBuilder = new ErrorBuilder();
+        foreach ($errors as $error) {
+            // KLUDGE: remove [] around field name
+            $field = substr($error->getPropertyPath(), 1, -1);
+
+            $errorBuilder->addDataError('data_stripe_credit_card.' . $field, $error->getMessage());
+        }
 
         if ($errorBuilder->hasErrors()) {
             throw $errorBuilder->getException();
         }
     }
-	
+
     /**
      * This method executes an approve transaction.
      *
@@ -146,13 +144,56 @@ class StripeCreditCardPlugin extends AbstractPlugin
      * @param \JMS\Payment\CoreBundle\Model\FinancialTransactionInterface $transaction
      * @param boolean $retry Whether this is a retry transaction
      * @return void
-	 * @throws \JMS\Payment\CoreBundle\Plugin\Exception\FinancialException      if there is a card error
-	 * @throws \JMS\Payment\CoreBundle\Plugin\Exception\InvalidDataException    if the request has invalid parameters
-	 * @throws \JMS\Payment\CoreBundle\Plugin\Exception\CommunicationException  if there is an API communiation error
-     */	
+     * @throws \JMS\Payment\CoreBundle\Plugin\Exception\FinancialException      if there is a card error
+     * @throws \JMS\Payment\CoreBundle\Plugin\Exception\InvalidDataException    if the request has invalid parameters
+     * @throws \JMS\Payment\CoreBundle\Plugin\Exception\CommunicationException  if there is an API communiation error
+     */
     public function approve(FinancialTransactionInterface $transaction, $retry)
     {
         $this->chargeCard($transaction, false);
+    }
+
+    /**
+     * Charge a card
+     *
+     * @param \JMS\Payment\CoreBundle\Model\FinancialTransactionInterface $transaction
+     * @param boolean $capture
+     * @throws \JMS\Payment\CoreBundle\Plugin\Exception\FinancialException      if there is a card error
+     * @throws \JMS\Payment\CoreBundle\Plugin\Exception\InvalidDataException    if the request has invalid parameters
+     * @throws \JMS\Payment\CoreBundle\Plugin\Exception\CommunicationException  if there is an API communiation error
+     */
+    protected function chargeCard(FinancialTransactionInterface $transaction, $capture = true)
+    {
+        try {
+            // verify and charge card
+            $charge = $this->client->charge($transaction, $capture);
+
+        } catch (\Stripe_CardError $e) {
+            $body = $e->getJsonBody();
+            $err = $body['error'];
+
+            $ex = new FinancialException($err['code']);
+            $transaction->setResponseCode($err['type']);
+            $transaction->setReasonCode($err['code']);
+            $ex->setFinancialTransaction($transaction);
+
+            throw $ex;
+
+        } catch (Exception $e) {
+            $ex = new FinancialException($e->getMessage());
+            $transaction->setResponseCode($e->getCode());
+            $transaction->setReasonCode(PluginInterface::REASON_CODE_INVALID);
+            $ex->setFinancialTransaction($transaction);
+
+            throw $ex;
+        }
+
+        // complete the transaction
+        $transaction->getExtendedData()->set('charge_id', $charge->id);
+        $transaction->setReferenceNumber($charge->id);
+        $transaction->setProcessedAmount($this->client->convertAmountFromStripeFormat($charge->amount));
+        $transaction->setResponseCode(PluginInterface::RESPONSE_CODE_SUCCESS);
+        $transaction->setReasonCode(PluginInterface::REASON_CODE_SUCCESS);
     }
 
     /**
@@ -167,49 +208,43 @@ class StripeCreditCardPlugin extends AbstractPlugin
      * @param \JMS\Payment\CoreBundle\Model\FinancialTransactionInterface $transaction
      * @param boolean $retry Whether this is a retry transaction
      * @return void
-	 * @throws \JMS\Payment\CoreBundle\Plugin\Exception\FinancialException      if there is a card error
-	 * @throws \JMS\Payment\CoreBundle\Plugin\Exception\InvalidDataException    if the request has invalid parameters
-	 * @throws \JMS\Payment\CoreBundle\Plugin\Exception\CommunicationException  if there is an API communiation error
+     * @throws \JMS\Payment\CoreBundle\Plugin\Exception\FinancialException      if there is a card error
+     * @throws \JMS\Payment\CoreBundle\Plugin\Exception\InvalidDataException    if the request has invalid parameters
+     * @throws \JMS\Payment\CoreBundle\Plugin\Exception\CommunicationException  if there is an API communiation error
      */
     public function approveAndDeposit(FinancialTransactionInterface $transaction, $retry)
     {
         $this->chargeCard($transaction, true);
     }
-	
-	/**
-	 * Charge a card
-	 * 
-	 * @param \JMS\Payment\CoreBundle\Model\FinancialTransactionInterface $transaction
-	 * @param boolean $capture
-	 * @throws \JMS\Payment\CoreBundle\Plugin\Exception\FinancialException      if there is a card error
-	 * @throws \JMS\Payment\CoreBundle\Plugin\Exception\InvalidDataException    if the request has invalid parameters
-	 * @throws \JMS\Payment\CoreBundle\Plugin\Exception\CommunicationException  if there is an API communiation error
-	 */
-    protected function chargeCard(FinancialTransactionInterface $transaction, $capture = true)
+
+    /**
+     * This method executes a credit transaction against a Credit.
+     *
+     * @param FinancialTransactionInterface $transaction
+     * @param $retry
+     * @throws \JMS\Payment\CoreBundle\Plugin\Exception\FinancialException
+     */
+    function credit(FinancialTransactionInterface $transaction, $retry)
     {
-		// verify and charge card
-		try {
-			$charge = $this->client->charge($transaction, $capture);
-			
-		} catch(\Stripe_CardError $e) {
-			$body = $e->getJsonBody();
-			$err  = $body['error'];
+        try {
+            // refund transaction
+            $response = $this->client->refund($transaction);
 
-			$ex = new FinancialException($err['code']);
-			$transaction->setResponseCode($err['type']);
-			$transaction->setReasonCode($err['code']);
-			$ex->setFinancialTransaction($transaction);
+        } catch (Exception $e) {
+            $ex = new FinancialException($e->getMessage());
+            $transaction->setResponseCode($e->getCode());
+            $transaction->setReasonCode(PluginInterface::REASON_CODE_INVALID);
+            $ex->setFinancialTransaction($transaction);
 
-			throw $ex;
-		  
-		} catch (Exception $e) {
-			throw $e;
-		}
-		
-		// complete the transaction
-		$transaction->setReferenceNumber($charge->id);
-        $transaction->setProcessedAmount($charge->amount/100);
+            throw $ex;
+        }
+
+        // complete the transaction
+        $transaction->setReferenceNumber($response->id);
         $transaction->setResponseCode(PluginInterface::RESPONSE_CODE_SUCCESS);
-        $transaction->setReasonCode(PluginInterface::REASON_CODE_SUCCESS);		
-	}
+        $transaction->setReasonCode(PluginInterface::REASON_CODE_SUCCESS);
+
+        $refund = array_pop($response->refunds);
+        $transaction->setProcessedAmount($this->client->convertAmountFromStripeFormat($refund->amount));
+    }
 }
