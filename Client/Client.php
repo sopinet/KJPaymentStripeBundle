@@ -12,12 +12,22 @@ use JMS\Payment\CoreBundle\Plugin\Exception\FinancialException;
 use JMS\Payment\CoreBundle\Plugin\Exception\CommunicationException;
 
 
-
 class Client
 {
+    /**
+     * @var string
+     */
     protected $apiKey;
+
+    /**
+     * @var null|string
+     */
     protected $apiVersion;
 
+    /**
+     * @param string $apiKey
+     * @param string $apiVersion
+     */
     public function __construct($apiKey, $apiVersion = null)
     {
         $this->apiKey = $apiKey;
@@ -36,10 +46,6 @@ class Client
      * @param FinancialTransactionInterface $transaction
      * @param bool $capture
      * @return \Stripe_Charge
-     * @throws \JMS\Payment\CoreBundle\Plugin\Exception
-     * @throws \JMS\Payment\CoreBundle\Plugin\Exception\InvalidDataException
-     * @throws \Exception|\Stripe_CardError
-     * @throws \JMS\Payment\CoreBundle\Plugin\Exception\CommunicationException
      */
     public function charge(FinancialTransactionInterface $transaction, $capture = true)
     {
@@ -67,44 +73,64 @@ class Client
                 ),
             ));
 
-        } catch (\Stripe_AuthenticationError $e) {
-            $body = $e->getJsonBody();
-            $err = $body['error'];
-
-            $ex = new FinancialException($e->getMessage());
-            $transaction->setResponseCode($err['type']);
-            $transaction->setReasonCode('authentication_error');
-            $ex->setFinancialTransaction($transaction);
-
-            throw $ex;
-
-        } catch (\Stripe_Error $e) {
-            $body = $e->getJsonBody();
-            $err = $body['error'];
-
-            if (array_key_exists('code', $err) && !empty($err['code'])) {
-                $reasonCode = $err['code'];
-            } else {
-                $reasonCode = PluginInterface::REASON_CODE_INVALID;
-            }
-
-            $ex = new FinancialException($err['message']);
-            $transaction->setResponseCode($err['type']);
-            $transaction->setReasonCode($reasonCode);
-            $ex->setFinancialTransaction($transaction);
-
-            throw $ex;
-
         } catch (\Exception $e) {
-            $ex = new FinancialException($e->getMessage());
-            $transaction->setResponseCode($e->getCode());
-            $transaction->setReasonCode(PluginInterface::REASON_CODE_INVALID);
-            $ex->setFinancialTransaction($transaction);
-
-            throw $ex;
+            $this->handleTransactionException($transaction, $e);
         }
 
         return $response;
+    }
+
+    /**
+     * Capture a charge
+     *
+     * @param string $chargeId
+     * @return \Stripe_Charge
+     */
+    public function capture($chargeId)
+    {
+        $charge = \Stripe_Charge::retrieve($chargeId);
+
+        return $charge->capture();
+    }
+
+    /**
+     * Full or Part refund
+     *
+     * @param FinancialTransactionInterface $transaction
+     * @return mixed
+     */
+    public function refund(FinancialTransactionInterface $transaction)
+    {
+        $data = $transaction->getExtendedData();
+
+        try {
+            $charge = \Stripe_Charge::retrieve($data->get('charge_id'));
+
+            $response = $charge->refund(array(
+                'amount' => $this->convertAmountToStripeFormat($transaction->getRequestedAmount()), // amount values are in cents
+                'refund_application_fee' => false
+            ));
+
+        } catch (\Exception $e) {
+            $this->handleTransactionException($transaction, $e);
+        }
+
+        return $response;
+    }
+
+    /**
+     * Test api credentials by attempting a balance request
+     *
+     * @return bool
+     */
+    public function testCredentials()
+    {
+        try {
+            $balance = \Stripe_Balance::retrieve();
+        } catch (\Exception $e) {
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -130,39 +156,15 @@ class Client
     }
 
     /**
-     * Capture a charge
-     *
-     * @param string $chargeId
-     * @return \Stripe_Charge
-     */
-    public function capture($chargeId)
-    {
-        $charge = \Stripe_Charge::retrieve($chargeId);
-
-        return $charge->capture();
-    }
-
-    /**
-     * Full or Part refund
+     * Handler for transaction errors
      *
      * @param FinancialTransactionInterface $transaction
-     * @return mixed
-     * @throws \JMS\Payment\CoreBundle\Plugin\Exception
-     * @throws \JMS\Payment\CoreBundle\Plugin\Exception\CommunicationException
+     * @param \Exception $e
+     * @throws \JMS\Payment\CoreBundle\Plugin\Exception\FinancialException
      */
-    public function refund(FinancialTransactionInterface $transaction)
+    protected function handleTransactionException(FinancialTransactionInterface $transaction, \Exception $e)
     {
-        $data = $transaction->getExtendedData();
-
-        try {
-            $charge = \Stripe_Charge::retrieve($data->get('charge_id'));
-
-            $response = $charge->refund(array(
-                'amount' => $this->convertAmountToStripeFormat($transaction->getRequestedAmount()), // amount values are in cents
-                'refund_application_fee' => false
-            ));
-
-        } catch (\Stripe_AuthenticationError $e) {
+        if ($e instanceof \Stripe_AuthenticationError) {
             $body = $e->getJsonBody();
             $err = $body['error'];
 
@@ -172,8 +174,8 @@ class Client
             $ex->setFinancialTransaction($transaction);
 
             throw $ex;
-
-        } catch (\Stripe_Error $e) {
+        }
+        elseif($e instanceof \Stripe_Error) {
             $body = $e->getJsonBody();
             $err = $body['error'];
 
@@ -189,8 +191,8 @@ class Client
             $ex->setFinancialTransaction($transaction);
 
             throw $ex;
-
-        } catch (\Exception $e) {
+        }
+        else {
             $ex = new FinancialException($e->getMessage());
             $transaction->setResponseCode($e->getCode());
             $transaction->setReasonCode(PluginInterface::REASON_CODE_INVALID);
@@ -198,7 +200,5 @@ class Client
 
             throw $ex;
         }
-
-        return $response;
     }
 }
