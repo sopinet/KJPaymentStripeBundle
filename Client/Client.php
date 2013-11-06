@@ -2,15 +2,7 @@
 
 namespace KJ\Payment\StripeBundle\Client;
 
-use JMS\Payment\CoreBundle\Entity\Payment;
-use JMS\Payment\CoreBundle\Model\PaymentInstructionInterface;
-use JMS\Payment\CoreBundle\Model\FinancialTransactionInterface;
-use JMS\Payment\CoreBundle\Plugin\PluginInterface;
-use JMS\Payment\CoreBundle\Plugin\Exception\Exception;
-use JMS\Payment\CoreBundle\Plugin\Exception\InvalidDataException;
-use JMS\Payment\CoreBundle\Plugin\Exception\FinancialException;
-use JMS\Payment\CoreBundle\Plugin\Exception\CommunicationException;
-
+use KJ\Payment\StripeBundle\Client\Response;
 
 class Client
 {
@@ -41,81 +33,181 @@ class Client
     }
 
     /**
-     * Charge a card
-     *
-     * @param FinancialTransactionInterface $transaction
+     * @param float $amount
+     * @param string $currency
+     * @param string $description
+     * @param array $cardDetails
      * @param bool $capture
-     * @return \Stripe_Charge
+     * @return Response
      */
-    public function charge(FinancialTransactionInterface $transaction, $capture = true)
+    public function chargeCard($amount, $currency, $description, array $cardDetails, $capture = true)
     {
-        $data = $transaction->getExtendedData();
-
-        try {
-
-            $response = \Stripe_Charge::create(array(
-                'capture' => $capture,
-                'amount' => $this->convertAmountToStripeFormat($transaction->getRequestedAmount()), // amount values are in cents
-                'currency' => $transaction->getPayment()->getPaymentInstruction()->getCurrency(),
-                'description' => $data->get('payment_description'),
-                'card' => array(
-                    'name' => $data->get('name'),
-                    'number' => $data->get('number'),
-                    'exp_month' => $data->get('exp_month'),
-                    'exp_year' => $data->get('exp_year'),
-                    'cvc' => $data->get('cvc'),
-                    'address_line1' => $data->get('address_line1'),
-                    'address_line2' => $data->get('address_line2'),
-                    'address_city' => $data->get('address_city'),
-                    'address_state' => $data->get('address_state'),
-                    'address_country' => $data->get('address_country'),
-                    'address_zip' => $data->get('address_zip'),
-                ),
-            ));
-
-        } catch (\Exception $e) {
-            $this->handleTransactionException($transaction, $e);
-        }
-
-        return $response;
+        return $this->sendChargeRequest('create', array(
+            'capture' => $capture,
+            'amount'  => $this->convertAmountToStripeFormat($amount),
+            'currency' => $currency,
+            'description' => $description,
+            'card' => $cardDetails
+        ));
     }
 
     /**
      * Capture a charge
      *
-     * @param string $chargeId
-     * @return \Stripe_Charge
+     * @param $chargeId
+     * @return Response
      */
     public function capture($chargeId)
     {
-        $charge = \Stripe_Charge::retrieve($chargeId);
+        $response = $this->sendChargeRequest('retrieve', $chargeId);
 
-        return $charge->capture();
+        if ($response->isSuccess()) {
+            $response->getResponse()->capture();
+        }
+
+        return $response;
     }
+
+    /**
+     * @param $method
+     * @param $param
+     * @return Response
+     */
+    protected function sendChargeRequest($method, $param)
+    {
+        try {
+            $response = \Stripe_Charge::$method($param);
+        } catch (\Exception $e) {
+            return new Response(null, $e);
+        }
+        return new Response($response);
+    }
+
+    /**
+     * @param array $cardDetails
+     * @return Response
+     */
+    public function createChargeToken(array $cardDetails)
+    {
+        return $this->sendTokenRequest('create', array(
+            'card' => $cardDetails
+        ));
+    }
+
+    /**
+     * @param $method
+     * @param $param
+     * @return Response
+     */
+    protected function sendTokenRequest($method, $param)
+    {
+        try {
+            $response = \Stripe_Token::$method($param);
+        } catch (\Exception $e) {
+            return new Response(null, $e);
+        }
+        return new Response($response);
+    }
+
+    /**
+     * @param string|array $card
+     * @param string $planId
+     * @param array $optionalParams
+     * @return Response
+     */
+    public function createCustomerRequest($card, $planId, array $optionalParams = array())
+    {
+        $allowedParams = array('account_balance', 'coupon', 'description', 'email', 'metadata', 'quantity', 'trial_end');
+
+        $optionalParams = array_intersect_key($optionalParams, array_flip($allowedParams));
+
+        return $this->sendCustomerRequest('create', array_merge($optionalParams, array(
+            'card' => $card,
+            'plan' => $planId
+        )));
+    }
+
+    /**
+     * @param $method
+     * @param $param
+     * @return Response
+     */
+    protected function sendCustomerRequest($method, $param)
+    {
+        try {
+            $response = \Stripe_Customer::$method($param);
+        } catch (\Exception $e) {
+            return new Response(null, $e);
+        }
+        return new Response($response);
+    }
+
 
     /**
      * Full or Part refund
      *
-     * @param FinancialTransactionInterface $transaction
-     * @return mixed
+     * @param string $chargeId
+     * @param float $amount
+     * @param bool $refundApplicationFee
+     * @return Response
      */
-    public function refund(FinancialTransactionInterface $transaction)
+    public function refund($chargeId, $amount, $refundApplicationFee = false)
     {
-        $data = $transaction->getExtendedData();
+        $response = $this->sendChargeRequest('retrieve', $chargeId);
 
-        try {
-            $charge = \Stripe_Charge::retrieve($data->get('charge_id'));
+        if ($response->isSuccess()) {
 
-            $response = $charge->refund(array(
-                'amount' => $this->convertAmountToStripeFormat($transaction->getRequestedAmount()), // amount values are in cents
-                'refund_application_fee' => false
-            ));
+            try {
+                $refundResponse = $response->getResponse()->refund(array(
+                    'amount' => $this->convertAmountToStripeFormat($amount),
+                    'refund_application_fee' => $refundApplicationFee,
+                ));
 
-        } catch (\Exception $e) {
-            $this->handleTransactionException($transaction, $e);
+            } catch (\Exception $e) {
+                return new Response(null, $e);
+            }
+
+            return new Response($refundResponse);
         }
 
         return $response;
+    }
+
+    /**
+     * @param array $params
+     * @return Response
+     */
+    public function createPlan(array $params)
+    {
+        $allowedParams = array('id', 'amount', 'currency', 'interval', 'interval_count', 'name', 'trial_period_days');
+
+        $params = array_intersect_key($params, array_flip($allowedParams));
+
+        return $this->sendPlanRequest('create', $params);
+    }
+
+    /**
+     * @param string $planId
+     * @return Response
+     */
+    public function retrievePlan($planId)
+    {
+        return $this->sendPlanRequest('retrieve', $planId);
+    }
+
+    /**
+     * @param $method
+     * @param $param
+     * @return Response
+     */
+    protected function sendPlanRequest($method, $param)
+    {
+        try {
+            $response = \Stripe_Plan::$method($param);
+        } catch (\Exception $e) {
+            return new Response(null, $e);
+        }
+        return new Response($response);
     }
 
     /**
@@ -126,7 +218,7 @@ class Client
     public function testCredentials()
     {
         try {
-            $balance = \Stripe_Balance::retrieve();
+            \Stripe_Balance::retrieve();
         } catch (\Exception $e) {
             return false;
         }
@@ -153,52 +245,5 @@ class Client
     public function convertAmountFromStripeFormat($amount)
     {
         return $amount / 100;
-    }
-
-    /**
-     * Handler for transaction errors
-     *
-     * @param FinancialTransactionInterface $transaction
-     * @param \Exception $e
-     * @throws \JMS\Payment\CoreBundle\Plugin\Exception\FinancialException
-     */
-    protected function handleTransactionException(FinancialTransactionInterface $transaction, \Exception $e)
-    {
-        if ($e instanceof \Stripe_AuthenticationError) {
-            $body = $e->getJsonBody();
-            $err = $body['error'];
-
-            $ex = new FinancialException($e->getMessage());
-            $transaction->setResponseCode($err['type']);
-            $transaction->setReasonCode('authentication_error');
-            $ex->setFinancialTransaction($transaction);
-
-            throw $ex;
-        }
-        elseif($e instanceof \Stripe_Error) {
-            $body = $e->getJsonBody();
-            $err = $body['error'];
-
-            if (array_key_exists('code', $err) && !empty($err['code'])) {
-                $reasonCode = $err['code'];
-            } else {
-                $reasonCode = PluginInterface::REASON_CODE_INVALID;
-            }
-
-            $ex = new FinancialException($err['message']);
-            $transaction->setResponseCode($err['type']);
-            $transaction->setReasonCode($reasonCode);
-            $ex->setFinancialTransaction($transaction);
-
-            throw $ex;
-        }
-        else {
-            $ex = new FinancialException($e->getMessage());
-            $transaction->setResponseCode($e->getCode());
-            $transaction->setReasonCode(PluginInterface::REASON_CODE_INVALID);
-            $ex->setFinancialTransaction($transaction);
-
-            throw $ex;
-        }
     }
 }

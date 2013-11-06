@@ -2,16 +2,17 @@
 
 namespace KJ\Payment\StripeBundle\Plugin;
 
+use Symfony\Component\Validator\Constraints as Assert;
+use Symfony\Component\Validator\Validator;
 use JMS\Payment\CoreBundle\Model\PaymentInstructionInterface;
 use JMS\Payment\CoreBundle\Model\FinancialTransactionInterface;
 use JMS\Payment\CoreBundle\Plugin\AbstractPlugin;
 use JMS\Payment\CoreBundle\Plugin\PluginInterface;
 use JMS\Payment\CoreBundle\Plugin\ErrorBuilder;
 use JMS\Payment\CoreBundle\Plugin\Exception\FinancialException;
+use JMS\Payment\CoreBundle\Plugin\RecurringPluginInterface;
 use KJ\Payment\StripeBundle\Client\Client;
-use Symfony\Component\Validator\Constraints as Assert;
-use Symfony\Component\Validator\Validation;
-use Symfony\Component\Validator\Validator;
+use KJ\Payment\StripeBundle\Client\Response;
 
 
 /**
@@ -19,12 +20,24 @@ use Symfony\Component\Validator\Validator;
  *
  * @author kjchew <kjchew@gmail.com>
  */
-class StripeCreditCardPlugin extends AbstractPlugin
+class StripeCreditCardPlugin extends AbstractPlugin implements RecurringPluginInterface
 {
+    /**
+     * Mapping of plan interval to stripe
+     *
+     * @var array
+     */
+    public static $intervalMapping = array(
+        PaymentInstructionInterface::INTERVAL_WEEKLY => 'week',
+        PaymentInstructionInterface::INTERVAL_MONTHLY => 'month',
+        PaymentInstructionInterface::INTERVAL_ANNUALLY => 'year',
+    );
+
     /**
      * @var \Symfony\Component\Validator\Validator
      */
     protected $validator;
+
     /**
      * @var \KJ\Payment\StripeBundle\Client\Client
      */
@@ -159,13 +172,37 @@ class StripeCreditCardPlugin extends AbstractPlugin
      */
     protected function chargeCard(FinancialTransactionInterface $transaction, $capture = true)
     {
-        // verify and charge card
-        $charge = $this->client->charge($transaction, $capture);
+        $data = $transaction->getExtendedData();
+
+        $opts = $data->has('checkout_params') ? $data->get('checkout_params') : array();
+
+        $cardDetails = array(
+            'name' => $data->get('name'),
+            'number' => $data->get('number'),
+            'exp_month' => $data->get('exp_month'),
+            'exp_year' => $data->get('exp_year'),
+            'cvc' => $data->get('cvc'),
+            'address_line1' => $data->get('address_line1'),
+            'address_line2' => $data->get('address_line2'),
+            'address_city' => $data->get('address_city'),
+            'address_state' => $data->get('address_state'),
+            'address_country' => $data->get('address_country'),
+            'address_zip' => $data->get('address_zip'),
+        );
+
+        $response = $this->client->chargeCard(
+            $transaction->getRequestedAmount(),
+            $transaction->getPayment()->getPaymentInstruction()->getCurrency(),
+            $opts['description'],
+            $cardDetails,
+            $capture
+        );
+        $this->throwUnlessSuccessResponse($response, $transaction);
 
         // complete the transaction
-        $transaction->getExtendedData()->set('charge_id', $charge->id);
-        $transaction->setReferenceNumber($charge->id);
-        $transaction->setProcessedAmount($this->client->convertAmountFromStripeFormat($charge->amount));
+        $transaction->getExtendedData()->set('charge_id', $response->getResponse()->id);
+        $transaction->setReferenceNumber($response->getResponse()->id);
+        $transaction->setProcessedAmount($this->client->convertAmountFromStripeFormat($response->getResponse()->amount));
         $transaction->setResponseCode(PluginInterface::RESPONSE_CODE_SUCCESS);
         $transaction->setReasonCode(PluginInterface::REASON_CODE_SUCCESS);
     }
@@ -195,17 +232,158 @@ class StripeCreditCardPlugin extends AbstractPlugin
      * @param $retry
      * @throws \JMS\Payment\CoreBundle\Plugin\Exception\FinancialException
      */
-    function credit(FinancialTransactionInterface $transaction, $retry)
+    public function credit(FinancialTransactionInterface $transaction, $retry)
     {
+        $data = $transaction->getExtendedData();
+
         // refund transaction
-        $response = $this->client->refund($transaction);
+        $response = $this->client->refund(
+            $data->get('charge_id'),
+            $transaction->getRequestedAmount()
+        );
+        $this->throwUnlessSuccessResponse($response, $transaction);
 
         // complete the transaction
-        $transaction->setReferenceNumber($response->id);
+        $transaction->setReferenceNumber($response->getResponse()->id);
         $transaction->setResponseCode(PluginInterface::RESPONSE_CODE_SUCCESS);
         $transaction->setReasonCode(PluginInterface::REASON_CODE_SUCCESS);
 
-        $refund = array_pop($response->refunds);
-        $transaction->setProcessedAmount($this->client->convertAmountFromStripeFormat($refund->amount));
+        $refund = array_pop($response->getResponse()->refunds);
+        $transaction->setProcessedAmount($this->client->convertAmountFromStripeFormat($refund->getResponse()->amount));
+    }
+
+    /**
+     * This method creates and assigns a subscription plan to a customer
+     *
+     * @param FinancialTransactionInterface $transaction
+     * @param bool $retry
+     * @throws \JMS\Payment\CoreBundle\Plugin\Exception\FinancialException
+     */
+    public function initializeRecurring(FinancialTransactionInterface $transaction, $retry)
+    {
+        $data = $transaction->getExtendedData();
+        $opts = $data->has('checkout_params') ? $data->get('checkout_params') : array();
+
+        $cardToken = $this->findOrCreateCardId($transaction);
+        $planId = $this->findOrCreatePlan($transaction);
+
+        // create customer and assign card and plan
+        $response = $this->client->createCustomerRequest($cardToken, $planId, $opts);
+        $this->throwUnlessSuccessResponse($response, $transaction);
+
+        // complete the transaction
+        $transaction->getExtendedData()->set('customer_id', $response->getResponse()->id);
+        $transaction->getExtendedData()->set('subscription_id', $response->getResponse()->subscription->id);
+        $transaction->setReferenceNumber($response->getResponse()->subscription->id);
+        $transaction->setProcessedAmount($transaction->getRequestedAmount());
+        $transaction->setResponseCode(PluginInterface::RESPONSE_CODE_SUCCESS);
+        $transaction->setReasonCode(PluginInterface::REASON_CODE_SUCCESS);
+    }
+
+    /**
+     * @param FinancialTransactionInterface $transaction
+     * @return mixed
+     */
+    protected function findOrCreateCardId(FinancialTransactionInterface $transaction)
+    {
+        $data = $transaction->getExtendedData();
+        if ($data->has('charge_id')) {
+            return $data->get('charge_id');
+        }
+        $cardDetails = array(
+            'name' => $data->get('name'),
+            'number' => $data->get('number'),
+            'exp_month' => $data->get('exp_month'),
+            'exp_year' => $data->get('exp_year'),
+            'cvc' => $data->get('cvc'),
+            'address_line1' => $data->get('address_line1'),
+            'address_line2' => $data->get('address_line2'),
+            'address_city' => $data->get('address_city'),
+            'address_state' => $data->get('address_state'),
+            'address_country' => $data->get('address_country'),
+            'address_zip' => $data->get('address_zip'),
+        );
+
+        $response = $this->client->createChargeToken($cardDetails);
+
+        $this->throwUnlessSuccessResponse($response, $transaction);
+
+        $data->set('charge_id', $response->getResponse()->id);
+
+        return $data->get('charge_id');
+    }
+
+    /**
+     * @param FinancialTransactionInterface $transaction
+     * @return mixed
+     */
+    protected function findOrCreatePlan(FinancialTransactionInterface $transaction)
+    {
+        $data = $transaction->getExtendedData();
+        if ($data->has('plan_id')) {
+            return $data->get('plan_id');
+        }
+
+        $opts = $data->has('checkout_params') ? $data->get('checkout_params') : array();
+
+        $opts['id'] = array_key_exists('id', $opts) ? $opts['id'] : '';
+
+        $response = $this->client->retrievePlan($opts['id']);
+
+        if (!$response->isSuccess()) {
+            $opts['amount'] = $this->client->convertAmountToStripeFormat($transaction->getRequestedAmount());
+            $opts['currency'] = $transaction->getPayment()->getPaymentInstruction()->getCurrency();
+            $opts['interval'] = $this->getIntervalForStripe($transaction->getPayment()->getPaymentInstruction()->getBillingInterval());
+            $opts['interval_count'] = $transaction->getPayment()->getPaymentInstruction()->getBillingFrequency();
+
+            $response = $this->client->createPlan($opts);
+        }
+        $this->throwUnlessSuccessResponse($response, $transaction);
+
+        $data->set('plan_id', $response->getResponse()->id);
+
+        return $data->get('plan_id');
+    }
+
+
+    /**
+     * @param Response $response
+     * @param FinancialTransactionInterface $transaction
+     * @throws \JMS\Payment\CoreBundle\Plugin\Exception\FinancialException
+     */
+    protected function throwUnlessSuccessResponse(Response $response, FinancialTransactionInterface $transaction)
+    {
+        if ($response->isSuccess()) {
+            return;
+        }
+
+        $transaction->setResponseCode($response->getErrorResponseCode());
+        $transaction->setReasonCode($response->getErrorReasonCode());
+
+        $ex = new FinancialException('Stripe-Response was not successful: '.$response->getErrorMessage());
+        $ex->setFinancialTransaction($transaction);
+
+        throw $ex;
+    }
+
+    /**
+     * @param string $interval
+     * @return string|bool
+     */
+    protected function getIntervalForStripe($interval)
+    {
+        if (array_key_exists($interval, self::$intervalMapping)) {
+            return self::$intervalMapping[$interval];
+        }
+        return false;
+    }
+
+    /**
+     * @param string $interval
+     * @return bool
+     */
+    public function intervalSupported($interval)
+    {
+        return false !== $this->getIntervalForStripe($interval);
     }
 }
