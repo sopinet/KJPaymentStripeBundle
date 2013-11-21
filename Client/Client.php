@@ -128,6 +128,15 @@ class Client
     }
 
     /**
+     * @param $customerId
+     * @return Response
+     */
+    public function retrieveCustomer($customerId)
+    {
+        return $this->sendCustomerRequest('retrieve', $customerId);
+    }
+
+    /**
      * @param $method
      * @param $param
      * @return Response
