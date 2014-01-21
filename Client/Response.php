@@ -61,12 +61,12 @@ class Response
 
     public function getErrorResponseCode()
     {
-        $this->errorResponseCode;
+        return $this->errorResponseCode;
     }
 
     public function getErrorReasonCode()
     {
-        $this->errorReasonCode;
+        return $this->errorReasonCode;
     }
 
 
