@@ -3,8 +3,9 @@
 namespace KJ\Payment\StripeBundle\Tests\Client;
 
 use KJ\Payment\StripeBundle\Client\Client;
+use KJ\Payment\StripeBundle\Tests\Functional\BundleTestCase;
 
-class ClientTest extends \PHPUnit_Framework_TestCase
+class ClientTest extends BundleTestCase
 {
     const API_KEY     = 'sk_test_HQcikp1OHuHqcoPJWuScNIVu';
     const API_VERSION = '2013-08-13';
@@ -14,7 +15,7 @@ class ClientTest extends \PHPUnit_Framework_TestCase
     {
         $client = new Client(self::API_KEY, self::API_VERSION);
 
-        $this->assertEquals(true, $client->testAuth());
+        $this->assertEquals(true, $client->testCredentials());
     }
 
 }

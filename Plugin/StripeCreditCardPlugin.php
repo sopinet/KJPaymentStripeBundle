@@ -10,10 +10,10 @@ use JMS\Payment\CoreBundle\Plugin\AbstractPlugin;
 use JMS\Payment\CoreBundle\Plugin\PluginInterface;
 use JMS\Payment\CoreBundle\Plugin\ErrorBuilder;
 use JMS\Payment\CoreBundle\Plugin\Exception\FinancialException;
+use JMS\Payment\CoreBundle\Plugin\Exception\InvalidPaymentInstructionException;
 use JMS\Payment\CoreBundle\Plugin\RecurringPluginInterface;
 use KJ\Payment\StripeBundle\Client\Client;
 use KJ\Payment\StripeBundle\Client\Response;
-
 
 /**
  * Stripe payment plugin
@@ -77,58 +77,102 @@ class StripeCreditCardPlugin extends AbstractPlugin implements RecurringPluginIn
      *
      * @param PaymentInstructionInterface $instruction
      *
-     * @throws \JMS\Payment\CoreBundle\Plugin\Exception\InvalidPaymentInstructionException if the the PaymentInstruction is not valid
+     * @throws InvalidPaymentInstructionException if the the PaymentInstruction is not valid
      */
     public function checkPaymentInstruction(PaymentInstructionInterface $instruction)
     {
-        // define form validators
-        $constraints = new Assert\Collection(array(
+
+        $validationFields = [
             'name' => array(
-                new Assert\NotBlank(array('message' => 'Required')),
+                new Assert\NotBlank(array('message' => 'Please enter a name')),
             ),
             'number' => array(
-                new Assert\NotBlank(array('message' => 'Required')),
-                new Assert\Length(array('min' => 12, 'max' => 19, 'minMessage' => 'Invalid card number 1', 'maxMessage' => 'Invalid card number 2')),
+                new Assert\NotBlank(array('message' => 'Please enter a card number')),
+                new Assert\Length(
+                    array(
+                        'min' => 12,
+                        'max' => 19,
+                        'minMessage' => 'Invalid card number',
+                        'maxMessage' => 'Invalid card number'
+                    )
+                ),
                 new Assert\Luhn(array('message' => 'Invalid card number')),
             ),
             'exp_month' => array(
-                new Assert\NotBlank(array('message' => 'Required')),
-                new Assert\Range(array('min' => 1, 'max' => 12, 'minMessage' => 'Invalid code value', 'maxMessage' => 'Invalid code value')),
+                new Assert\NotBlank(array('message' => 'Please enter an expiry month')),
+                new Assert\Range(
+                    array(
+                        'min' => 1,
+                        'max' => 12,
+                        'minMessage' => 'Invalid expiry month',
+                        'maxMessage' => 'Invalid expiry month'
+                    )
+                ),
             ),
             'exp_year' => array(
-                new Assert\NotBlank(array('message' => 'Required')),
-                new Assert\Range(array('min' => date('Y'), 'max' => date('Y', strtotime('+20 years')), 'minMessage' => 'Invalid date', 'maxMessage' => 'Invalid date')),
+                new Assert\NotBlank(array('message' => 'Please enter an expiry year')),
+                new Assert\Range(
+                    array(
+                        'min' => date('Y'),
+                        'max' => date('Y', strtotime('+20 years')),
+                        'minMessage' => 'Invalid expiry year',
+                        'maxMessage' => 'Invalid expiry year'
+                    )
+                ),
             ),
             'cvc' => array(
-                new Assert\NotBlank(array('message' => 'Required')),
-                new Assert\Length(array('min' => 3, 'max' => 4, 'minMessage' => 'Invalid code value', 'maxMessage' => 'Invalid code value')),
+                new Assert\NotBlank(array('message' => 'Please enter a security code')),
+                new Assert\Length(
+                    array(
+                        'min' => 3,
+                        'max' => 4,
+                        'minMessage' => 'Invalid security code',
+                        'maxMessage' => 'Invalid security code'
+                    )
+                ),
             ),
             'address_line1' => array(
-                new Assert\NotBlank(array('message' => 'Required')),
+                new Assert\NotBlank(array('message' => 'Please enter your address')),
             ),
             'address_line2' => array(),
             'address_city' => array(
-                new Assert\NotBlank(array('message' => 'Required')),
+                new Assert\NotBlank(array('message' => 'Please enter a city')),
             ),
             'address_state' => array(
-                new Assert\NotBlank(array('message' => 'Required')),
             ),
             'address_country' => array(
-                new Assert\NotBlank(array('message' => 'Required')),
+                new Assert\NotBlank(array('message' => 'Please enter a country')),
             ),
             'address_zip' => array(
-                new Assert\NotBlank(array('message' => 'Required')),
+                new Assert\NotBlank(array('message' => 'Please enter a post code')),
             ),
-        ));
+        ];
+
+        if ($instruction->getExtendedData()->get('address_country') == 'US') {
+
+            $validationFields['address_state'] = array(
+                new Assert\NotBlank(array('message' => 'Please enter a state')),
+            );
+
+            $validationFields['address_zip'] = array(
+                new Assert\NotBlank(array('message' => 'Please enter a zip code')),
+            );
+
+        }
+
+        // define form validators
+        $constraints = new Assert\Collection($validationFields);
+
+
 
         // extract form values from extended data
-        $dateToValidate = array();
+        $dataToValidate = array();
         foreach ($constraints->fields as $name => $constraint) {
-            $dateToValidate[$name] = $instruction->getExtendedData()->get($name);
+            $dataToValidate[$name] = $instruction->getExtendedData()->get($name);
         }
 
         // validate input data
-        $errors = $this->validator->validateValue($dateToValidate, $constraints);
+        $errors = $this->validator->validateValue($dataToValidate, $constraints);
 
         // transform validator errors into payment exceptions
         $errorBuilder = new ErrorBuilder();

@@ -72,7 +72,6 @@ class StripeCreditCardType extends AbstractType
             ->add('address_line2', 'text', array(
                 'required' => false,
                 'error_type' => 'block',
-                'required' => false,
                 'render_optional_text' => false,
             ))
             ->add('address_city', 'text', array(
