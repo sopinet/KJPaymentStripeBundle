@@ -3,11 +3,11 @@
 namespace KJ\Payment\StripeBundle\Tests\Controller;
 
 use JMS\Payment\CoreBundle\PluginController\Result;
+use KJ\Payment\StripeBundle\Client\Client;
+use KJ\Payment\StripeBundle\Tests\Functional\BundleTestCase;
+use Symfony\Component\Form\Form;
 
-use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
-
-
-class PaymentControllerTest extends WebTestCase
+class PaymentControllerTest extends BundleTestCase
 {
     /**
      * @var Symfony\Component\HttpKernel\AppKernel
@@ -207,13 +207,19 @@ class PaymentControllerTest extends WebTestCase
         $this->assertEquals(Result::STATUS_SUCCESS, $result->getStatus(), $cardType.': Transaction not successful, reason '.$result->getReasonCode());
     }
 
+    protected static function createClient()
+    {
+        return new Client(self::API_KEY, self::API_VERSION);
+    }
+
     /**
      * @return null
      */
     public function setUp()
     {
-        self::$client = self::createClient();
-
+        static::$kernel = static::createKernel();
+        static::$kernel->boot();
+        static::$client = static::createClient();
         parent::setUp();
     }
 
@@ -222,7 +228,9 @@ class PaymentControllerTest extends WebTestCase
      */
     public function tearDown()
     {
-        static::$kernel->shutdown();
+        if (null !== static::$kernel) {
+            static::$kernel->shutdown();
+        }
 
         parent::tearDown();
     }
@@ -236,4 +244,5 @@ class PaymentControllerTest extends WebTestCase
     {
         return static::$kernel->getContainer()->get($service);
     }
+
 }

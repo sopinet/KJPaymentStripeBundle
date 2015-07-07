@@ -3,6 +3,8 @@
 namespace KJ\Payment\StripeBundle\Client;
 
 use KJ\Payment\StripeBundle\Client\Response;
+use Stripe\Balance;
+use Stripe\Stripe;
 
 class Client
 {
@@ -25,10 +27,10 @@ class Client
         $this->apiKey = $apiKey;
         $this->apiVersion = $apiVersion;
 
-        \Stripe::setApiKey($this->apiKey);
+        Stripe::setApiKey($this->apiKey);
 
         if ($this->apiVersion) {
-            \Stripe::setApiVersion($this->apiVersion);
+            Stripe::setApiVersion($this->apiVersion);
         }
     }
 
@@ -227,7 +229,7 @@ class Client
     public function testCredentials()
     {
         try {
-            \Stripe_Balance::retrieve();
+            Balance::retrieve();
         } catch (\Exception $e) {
             return false;
         }

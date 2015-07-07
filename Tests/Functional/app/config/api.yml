@@ -1,0 +1,6 @@
+kj_payment_stripe:
+    api_key:              sk_test_HQcikp1OHuHqcoPJWuScNIVu
+    api_version:          2013-08-13
+
+jms_payment_core:
+    secret: JustForTests!
