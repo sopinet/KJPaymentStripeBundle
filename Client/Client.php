@@ -122,7 +122,7 @@ class Client
      */
     public function createCustomerRequest($card, $planId, array $optionalParams = array())
     {
-        $allowedParams = [
+        $allowedParams = array(
             'account_balance',
             'coupon',
             'description',
@@ -130,7 +130,7 @@ class Client
             'metadata',
             'quantity',
             'trial_end'
-        ];
+        );
 
         $optionalParams = array_intersect_key($optionalParams, array_flip($allowedParams));
 
@@ -138,10 +138,10 @@ class Client
             'create',
             array_merge(
                 $optionalParams,
-                [
+                array(
                     'card' => $card,
                     'plan' => $planId
-                ]
+                )
             )
         );
     }
