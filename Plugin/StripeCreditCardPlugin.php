@@ -82,7 +82,7 @@ class StripeCreditCardPlugin extends AbstractPlugin implements RecurringPluginIn
     public function checkPaymentInstruction(PaymentInstructionInterface $instruction)
     {
 
-        $validationFields = [
+        $validationFields = array(
             'name' => array(
                 new Assert\NotBlank(array('message' => 'Please enter a name')),
             ),
@@ -146,7 +146,7 @@ class StripeCreditCardPlugin extends AbstractPlugin implements RecurringPluginIn
             'address_zip' => array(
                 new Assert\NotBlank(array('message' => 'Please enter a post code')),
             ),
-        ];
+        );
 
         if ($instruction->getExtendedData()->get('address_country') == 'US') {
 

@@ -2,9 +2,12 @@
 
 namespace KJ\Payment\StripeBundle\Client;
 
-use KJ\Payment\StripeBundle\Client\Response;
 use Stripe\Balance;
+use Stripe\Charge;
+use Stripe\Customer;
+use Stripe\Plan;
 use Stripe\Stripe;
+use Stripe\Token;
 
 class Client
 {
@@ -78,7 +81,7 @@ class Client
     protected function sendChargeRequest($method, $param)
     {
         try {
-            $response = \Stripe_Charge::$method($param);
+            $response = Charge::$method($param);
         } catch (\Exception $e) {
             return new Response(null, $e);
         }
@@ -104,7 +107,7 @@ class Client
     protected function sendTokenRequest($method, $param)
     {
         try {
-            $response = \Stripe_Token::$method($param);
+            $response = Token::$method($param);
         } catch (\Exception $e) {
             return new Response(null, $e);
         }
@@ -119,14 +122,28 @@ class Client
      */
     public function createCustomerRequest($card, $planId, array $optionalParams = array())
     {
-        $allowedParams = array('account_balance', 'coupon', 'description', 'email', 'metadata', 'quantity', 'trial_end');
+        $allowedParams = array(
+            'account_balance',
+            'coupon',
+            'description',
+            'email',
+            'metadata',
+            'quantity',
+            'trial_end'
+        );
 
         $optionalParams = array_intersect_key($optionalParams, array_flip($allowedParams));
 
-        return $this->sendCustomerRequest('create', array_merge($optionalParams, array(
-            'card' => $card,
-            'plan' => $planId
-        )));
+        return $this->sendCustomerRequest(
+            'create',
+            array_merge(
+                $optionalParams,
+                array(
+                    'card' => $card,
+                    'plan' => $planId
+                )
+            )
+        );
     }
 
     /**
@@ -146,7 +163,7 @@ class Client
     protected function sendCustomerRequest($method, $param)
     {
         try {
-            $response = \Stripe_Customer::$method($param);
+            $response = Customer::$method($param);
         } catch (\Exception $e) {
             return new Response(null, $e);
         }
@@ -214,7 +231,7 @@ class Client
     protected function sendPlanRequest($method, $param)
     {
         try {
-            $response = \Stripe_Plan::$method($param);
+            $response = Plan::$method($param);
         } catch (\Exception $e) {
             return new Response(null, $e);
         }
