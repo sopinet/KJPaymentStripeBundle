@@ -3,7 +3,7 @@
 namespace KJ\Payment\StripeBundle\Client;
 
 use JMS\Payment\CoreBundle\Plugin\PluginInterface;
-
+use Stripe\Error\Base as Error;
 
 class Response
 {
@@ -19,7 +19,7 @@ class Response
         $this->response = $response;
         $this->error = $error;
 
-        if ($error instanceof \Stripe_Error) {
+        if ($error instanceof Error) {
             $body = $error->getJsonBody();
             $err = $body['error'];
 
@@ -31,8 +31,7 @@ class Response
             } else {
                 $this->errorReasonCode  = PluginInterface::REASON_CODE_INVALID;
             }
-        }
-        elseif ($error instanceof \Exception) {
+        } elseif ($error instanceof \Exception) {
             $this->errorMessage = $error->getMessage();
             $this->errorResponseCode = $error->getCode();
             $this->errorReasonCode = PluginInterface::REASON_CODE_INVALID;
@@ -68,6 +67,4 @@ class Response
     {
         return $this->errorReasonCode;
     }
-
-
 } 
