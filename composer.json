@@ -1,5 +1,5 @@
 {
-    "name": "kj/payment-stripe-bundle",
+    "name": "sopinet/kj-payment-stripe-bundle",
     "type": "symfony-bundle",
     "description": "Payment Bundle providing access to the Stripe API",
     "keywords": ["stripe", "payment", "Symfony2"],
