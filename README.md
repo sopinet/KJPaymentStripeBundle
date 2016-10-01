@@ -7,12 +7,14 @@ Payment Bundle providing access to the Stripe API
 
 ## composer
 
-composer require sopinet/KJPaymentStripeBundle
+composer require kj/payment-stripe-bundle
 
 ## AppKernel
 
 add to AppKernel: 
+```
     new KJ\Payment\StripeBundle\KJPaymentStripeBundle(),
+```
 
 ## config.yml
 
