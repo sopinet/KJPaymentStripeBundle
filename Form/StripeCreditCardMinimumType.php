@@ -6,7 +6,7 @@ use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\FormBuilderInterface;
 
 
-class StripeCreditCardType extends AbstractType
+class StripeCreditCardMinimumType extends AbstractType
 {
     public function getName()
     {
@@ -29,7 +29,7 @@ class StripeCreditCardType extends AbstractType
             ))
             ->add('exp_month', 'choice', array(
                 'label' => 'Card expiry',
-                'choices' => array('01' => 'Jan', '02' => 'Feb', '03' => 'Mar', '04' => 'Apr', '05' => 'May', '06' => 'Jun', '07' => 'Jul', '08' => 'Aug', '09' => 'Sep', '10' => 'Oct', '11' => 'Nov', '12' => 'Dec'),
+                'choices' => array('01' => '01', '02' => '02', '03' => '03', '04' => '04', '05' => '05', '06' => '06', '07' => '07', '08' => '08', '09' => '09', '10' => '10', '11' => '11', '12' => '12'),
                 'empty_value' => 'MM',
                 'attr' => array(
                     'class' => 'input-mini',
@@ -50,32 +50,6 @@ class StripeCreditCardType extends AbstractType
                 'attr' => array(
                     'class' => 'input-mini',
                     'maxlength' => 4,
-                ),
-                'required' => false,
-            ))
-            ->add('address_line1', 'text', array(
-                'label' => 'Billing address',
-                'required' => false,
-            ))
-            ->add('address_line2', 'text', array(
-                'required' => false,
-            ))
-            ->add('address_city', 'text', array(
-                'label' => 'City',
-                'required' => false,
-            ))
-            ->add('address_state', 'text', array(
-                'label' => 'State',
-                'required' => false,
-            ))
-            ->add('address_country', 'text', array(
-                'label' => 'Country',
-                'required' => false,
-            ))
-            ->add('address_zip', 'text', array(
-                'label' => 'Postcode / Zip code',
-                'attr' => array(
-                    'class' => 'input-small',
                 ),
                 'required' => false,
             ));

@@ -11,7 +11,7 @@ use JMS\Payment\CoreBundle\Plugin\PluginInterface;
 use JMS\Payment\CoreBundle\Plugin\ErrorBuilder;
 use JMS\Payment\CoreBundle\Plugin\Exception\FinancialException;
 use JMS\Payment\CoreBundle\Plugin\Exception\InvalidPaymentInstructionException;
-use JMS\Payment\CoreBundle\Plugin\RecurringPluginInterface;
+//use JMS\Payment\CoreBundle\Plugin\RecurringPluginInterface;
 use KJ\Payment\StripeBundle\Client\Client;
 use KJ\Payment\StripeBundle\Client\Response;
 
@@ -20,18 +20,20 @@ use KJ\Payment\StripeBundle\Client\Response;
  *
  * @author kjchew <kjchew@gmail.com>
  */
-class StripeCreditCardPlugin extends AbstractPlugin implements RecurringPluginInterface
+class StripeCreditCardPlugin extends AbstractPlugin
 {
     /**
      * Mapping of plan interval to stripe
      *
      * @var array
      */
+    /**
     public static $intervalMapping = array(
-        PaymentInstructionInterface::INTERVAL_WEEKLY => 'week',
-        PaymentInstructionInterface::INTERVAL_MONTHLY => 'month',
-        PaymentInstructionInterface::INTERVAL_ANNUALLY => 'year',
+    PaymentInstructionInterface::INTERVAL_WEEKLY => 'week',
+    PaymentInstructionInterface::INTERVAL_MONTHLY => 'month',
+    PaymentInstructionInterface::INTERVAL_ANNUALLY => 'year',
     );
+     **/
 
     /**
      * @var \Symfony\Component\Validator\Validator
@@ -81,7 +83,6 @@ class StripeCreditCardPlugin extends AbstractPlugin implements RecurringPluginIn
      */
     public function checkPaymentInstruction(PaymentInstructionInterface $instruction)
     {
-
         $validationFields = array(
             'name' => array(
                 new Assert\NotBlank(array('message' => 'Please enter a name')),
@@ -130,40 +131,45 @@ class StripeCreditCardPlugin extends AbstractPlugin implements RecurringPluginIn
                         'maxMessage' => 'Invalid security code'
                     )
                 ),
-            ),
-            'address_line1' => array(
-                new Assert\NotBlank(array('message' => 'Please enter your address')),
-            ),
-            'address_line2' => array(),
-            'address_city' => array(
-                new Assert\NotBlank(array('message' => 'Please enter a city')),
-            ),
-            'address_state' => array(
-            ),
-            'address_country' => array(
-                new Assert\NotBlank(array('message' => 'Please enter a country')),
-            ),
-            'address_zip' => array(
-                new Assert\NotBlank(array('message' => 'Please enter a post code')),
-            ),
+            )
         );
 
-        if ($instruction->getExtendedData()->get('address_country') == 'US') {
+
+        if ($instruction->getExtendedData()->has('address_line1')) {
+            $validationFields['address_line1'] = array(
+                new Assert\NotBlank(array('message' => 'Please enter your address')),
+            );
+
+            $validationFields['address_city'] = array(
+                new Assert\NotBlank(array('message' => 'Please enter a city')),
+            );
 
             $validationFields['address_state'] = array(
-                new Assert\NotBlank(array('message' => 'Please enter a state')),
+            );
+
+            $validationFields['address_country'] = array(
+                new Assert\NotBlank(array('message' => 'Please enter a country')),
             );
 
             $validationFields['address_zip'] = array(
-                new Assert\NotBlank(array('message' => 'Please enter a zip code')),
+                new Assert\NotBlank(array('message' => 'Please enter a post code')),
             );
 
+            if ($instruction->getExtendedData()->get('address_country') == 'US') {
+
+                $validationFields['address_state'] = array(
+                    new Assert\NotBlank(array('message' => 'Please enter a state')),
+                );
+
+                $validationFields['address_zip'] = array(
+                    new Assert\NotBlank(array('message' => 'Please enter a zip code')),
+                );
+
+            }
         }
 
         // define form validators
         $constraints = new Assert\Collection($validationFields);
-
-
 
         // extract form values from extended data
         $dataToValidate = array();
@@ -219,6 +225,7 @@ class StripeCreditCardPlugin extends AbstractPlugin implements RecurringPluginIn
         $data = $transaction->getExtendedData();
 
         $opts = $data->has('checkout_params') ? $data->get('checkout_params') : array();
+        if (!isset($opts['description'])) $opts['description'] = "";
 
         $cardDetails = array(
             'name' => $data->get('name'),
@@ -226,13 +233,16 @@ class StripeCreditCardPlugin extends AbstractPlugin implements RecurringPluginIn
             'exp_month' => $data->get('exp_month'),
             'exp_year' => $data->get('exp_year'),
             'cvc' => $data->get('cvc'),
-            'address_line1' => $data->get('address_line1'),
-            'address_line2' => $data->get('address_line2'),
-            'address_city' => $data->get('address_city'),
-            'address_state' => $data->get('address_state'),
-            'address_country' => $data->get('address_country'),
-            'address_zip' => $data->get('address_zip'),
         );
+
+        if ($data->has('address_line1')) {
+            $cardDetails['address_line1'] = $data->get('address_line1');
+            $cardDetails['address_line2'] = $data->get('address_line2');
+            $cardDetails['address_city'] = $data->get('address_city');
+            $cardDetails['address_state'] = $data->get('address_state');
+            $cardDetails['address_country'] = $data->get('address_country');
+            $cardDetails['address_zip'] = $data->get('address_zip');
+        }
 
         $response = $this->client->chargeCard(
             $transaction->getRequestedAmount(),
@@ -340,13 +350,16 @@ class StripeCreditCardPlugin extends AbstractPlugin implements RecurringPluginIn
             'exp_month' => $data->get('exp_month'),
             'exp_year' => $data->get('exp_year'),
             'cvc' => $data->get('cvc'),
-            'address_line1' => $data->get('address_line1'),
-            'address_line2' => $data->get('address_line2'),
-            'address_city' => $data->get('address_city'),
-            'address_state' => $data->get('address_state'),
-            'address_country' => $data->get('address_country'),
-            'address_zip' => $data->get('address_zip'),
         );
+
+        if ($data->has('address_line1')) {
+            $cardDetails['address_line1'] = $data->get('address_line1');
+            $cardDetails['address_line2'] = $data->get('address_line2');
+            $cardDetails['address_city'] = $data->get('address_city');
+            $cardDetails['address_state'] = $data->get('address_state');
+            $cardDetails['address_country'] = $data->get('address_country');
+            $cardDetails['address_zip'] = $data->get('address_zip');
+        }
 
         $response = $this->client->createChargeToken($cardDetails);
 
