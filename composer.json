@@ -5,7 +5,7 @@
     "keywords": ["stripe", "payment", "Symfony2"],
     "homepage": "https://github.com/kengjin/KJPaymentStripeBundle",
     "license": "MIT",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "authors": [
         {
             "name": "Keng Jin Chew",

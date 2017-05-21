@@ -11,6 +11,11 @@ use Stripe\Token;
 
 class Client
 {
+    // Information from https://support.stripe.com/questions/which-zero-decimal-currencies-does-stripe-support
+    protected $zero_array_currency = array(
+        "BIF", "DJF", "JPY", "KRW", "PYG", "VND", "XAF", "XPF",
+        "CLP", "GNF", "KMF", "MGA", "RWF", "VUV", "XOF");
+
     /**
      * @var string
      */
@@ -49,7 +54,7 @@ class Client
     {
         return $this->sendChargeRequest('create', array(
             'capture' => $capture,
-            'amount'  => $this->convertAmountToStripeFormat($amount),
+            'amount'  => $this->convertAmountToStripeFormat($amount, $currency),
             'currency' => $currency,
             'description' => $description,
             'card' => $cardDetails
@@ -179,7 +184,7 @@ class Client
      * @param bool $refundApplicationFee
      * @return Response
      */
-    public function refund($chargeId, $amount, $refundApplicationFee = false)
+    public function refund($chargeId, $amount, $currency, $refundApplicationFee = false)
     {
         $response = $this->sendChargeRequest('retrieve', $chargeId);
 
@@ -187,7 +192,7 @@ class Client
 
             try {
                 $refundResponse = $response->getResponse()->refund(array(
-                    'amount' => $this->convertAmountToStripeFormat($amount),
+                    'amount' => $this->convertAmountToStripeFormat($amount, $currency),
                     'refund_application_fee' => $refundApplicationFee,
                 ));
 
@@ -253,15 +258,23 @@ class Client
         return true;
     }
 
+    public function isZeroCurrency($currency) {
+        return (in_array(strtoupper($currency), $this->zero_array_currency));
+    }
+
     /**
      * Convert transaction amount to stripe amount format
      *
      * @param float $amount
      * @return integer
      */
-    public function convertAmountToStripeFormat($amount)
+    public function convertAmountToStripeFormat($amount, $currency)
     {
-        return $amount * 100;
+        if ($this->isZeroCurrency($currency)) {
+            return $amount;
+        } else {
+            return $amount * 100;
+        }
     }
 
     /**
@@ -270,8 +283,12 @@ class Client
      * @param $amount
      * @return float
      */
-    public function convertAmountFromStripeFormat($amount)
+    public function convertAmountFromStripeFormat($amount, $currency)
     {
-        return $amount / 100;
+        if ($this->isZeroCurrency($currency)) {
+            return $amount;
+        } else {
+            return $amount / 100;
+        }
     }
 }

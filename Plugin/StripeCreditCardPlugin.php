@@ -256,7 +256,10 @@ class StripeCreditCardPlugin extends AbstractPlugin
         // complete the transaction
         $transaction->getExtendedData()->set('charge_id', $response->getResponse()->id);
         $transaction->setReferenceNumber($response->getResponse()->id);
-        $transaction->setProcessedAmount($this->client->convertAmountFromStripeFormat($response->getResponse()->amount));
+        $transaction->setProcessedAmount($this->client->convertAmountFromStripeFormat(
+            $response->getResponse()->amount,
+            $transaction->getPayment()->getPaymentInstruction()->getCurrency()
+        ));
         $transaction->setResponseCode(PluginInterface::RESPONSE_CODE_SUCCESS);
         $transaction->setReasonCode(PluginInterface::REASON_CODE_SUCCESS);
     }
@@ -293,7 +296,8 @@ class StripeCreditCardPlugin extends AbstractPlugin
         // refund transaction
         $response = $this->client->refund(
             $data->get('charge_id'),
-            $transaction->getRequestedAmount()
+            $transaction->getRequestedAmount(),
+            $transaction->getPayment()->getPaymentInstruction()->getCurrency()
         );
         $this->throwUnlessSuccessResponse($response, $transaction);
 
@@ -303,7 +307,10 @@ class StripeCreditCardPlugin extends AbstractPlugin
         $transaction->setReasonCode(PluginInterface::REASON_CODE_SUCCESS);
 
         $refund = array_pop($response->getResponse()->refunds);
-        $transaction->setProcessedAmount($this->client->convertAmountFromStripeFormat($refund->getResponse()->amount));
+        $transaction->setProcessedAmount($this->client->convertAmountFromStripeFormat(
+            $refund->getResponse()->amount,
+            $transaction->getPayment()->getPaymentInstruction()->getCurrency()
+        ));
     }
 
     /**
@@ -388,7 +395,10 @@ class StripeCreditCardPlugin extends AbstractPlugin
         $response = $this->client->retrievePlan($opts['id']);
 
         if (!$response->isSuccess()) {
-            $opts['amount'] = $this->client->convertAmountToStripeFormat($transaction->getRequestedAmount());
+            $opts['amount'] = $this->client->convertAmountToStripeFormat(
+                $transaction->getRequestedAmount(),
+                $transaction->getPayment()->getPaymentInstruction()->getCurrency()
+            );
             $opts['currency'] = $transaction->getPayment()->getPaymentInstruction()->getCurrency();
             $opts['interval'] = $this->getIntervalForStripe($transaction->getPayment()->getPaymentInstruction()->getBillingInterval());
             $opts['interval_count'] = $transaction->getPayment()->getPaymentInstruction()->getBillingFrequency();
