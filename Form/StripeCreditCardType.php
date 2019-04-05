@@ -30,7 +30,7 @@ class StripeCreditCardType extends AbstractType
             ->add('exp_month', 'choice', array(
                 'label' => 'Card expiry',
                 'choices' => array('01' => 'Jan', '02' => 'Feb', '03' => 'Mar', '04' => 'Apr', '05' => 'May', '06' => 'Jun', '07' => 'Jul', '08' => 'Aug', '09' => 'Sep', '10' => 'Oct', '11' => 'Nov', '12' => 'Dec'),
-                'empty_value' => 'MM',
+                'empty_data' => 'MM',
                 'attr' => array(
                     'class' => 'input-mini',
                 ),
@@ -38,7 +38,7 @@ class StripeCreditCardType extends AbstractType
             ))
             ->add('exp_year', 'choice', array(
                 'label' => ' ',
-                'empty_value' => 'YYYY',
+                'empty_data' => 'YYYY',
                 'choices' => array_combine(range(date('Y'), date('Y') + 20), range(date('Y'), date('Y') + 20)),
                 'attr' => array(
                     'class' => 'input-small',
