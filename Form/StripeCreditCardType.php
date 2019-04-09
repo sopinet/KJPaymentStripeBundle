@@ -30,22 +30,28 @@ class StripeCreditCardType extends AbstractType
             ))
             ->add('exp_month', ChoiceType::class, array(
                 'label' => 'Card expiry',
-                'choices' => array('MM' => 'MM', '01' => 'Jan', '02' => 'Feb', '03' => 'Mar', '04' => 'Apr', '05' => 'May', '06' => 'Jun', '07' => 'Jul', '08' => 'Aug', '09' => 'Sep', '10' => 'Oct', '11' => 'Nov', '12' => 'Dec'),
-                'empty_data' => 'MM',
+                'choices' => array_combine(
+                    range(1, 12),
+                    range(1, 12)
+                ),
+                'empty_data' => date('n'),
                 'attr' => array(
                     'class' => 'input-mini',
                 ),
                 'required' => false,
             ))
-            ->add('exp_year', ChoiceType::class, array(
+            ->add('exp_year', ChoiceType::class, [
                 'label' => ' ',
-                'empty_data' => 'YYYY',
-                'choices' => array_merge(array('YYYY'), array_combine(range(date('Y'), date('Y') + 40), range(date('Y'), date('Y') + 40))),
-                'attr' => array(
-                    'class' => 'input-small',
+                'empty_data' => date('Y'),
+                'choices' => array_combine(
+                    range(date('Y'), (date('Y') + 20)),
+                    range(date('Y'), (date('Y') + 20))
                 ),
+                'attr' => [
+                    'class' => 'input-small',
+                ],
                 'required' => false,
-            ))
+            ])
             ->add('cvc', 'text', array(
                 'label' => 'CVC',
                 'attr' => array(
